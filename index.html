@@ -379,7 +379,12 @@ function drawBird(b){
 }
 
 function spawnPlatform(atY){
-  var y=atY!==undefined?atY:getTopY()-35-Math.random()*15;
+  // 화면 크기에 따라 간격 조절 (모바일은 더 넓게)
+  var isMobile=H<700;
+  var difficulty=Math.min(1, score/500); // 0~1
+  var gapMin=(isMobile?55:35)+Math.floor(difficulty*25);
+  var gapRand=(isMobile?30:15)+Math.floor(difficulty*15);
+  var y=atY!==undefined?atY:getTopY()-gapMin-Math.random()*gapRand;
   var x=Math.random()*(W-160)+10; // 너비 최대값 고려
   var r=Math.random();
   var type='normal';
@@ -412,7 +417,9 @@ function initGame(){
   // 시작 발판
   platforms.push({x:W/2-55,y:H-60,w:110,h:12,type:'normal',vx:0,hit:false}); // 시작 발판은 크게
   // 초기 발판들
-  for(var i=0;i<16;i++) spawnPlatform(H-60-60-i*48);
+  var initGap=H<700?65:48;
+  var initCount=H<700?14:16;
+  for(var i=0;i<initCount;i++) spawnPlatform(H-60-60-i*initGap);
 
   document.getElementById('h-score').textContent='0m';
   document.getElementById('h-best').textContent=bestScore+'m';
@@ -484,7 +491,7 @@ function loop(){
   }
 
   // 발판 부족하면 추가
-  while(getTopY()>scrollY-H*0.8)spawnPlatform();
+  while(getTopY()>scrollY-H*(H<700?0.6:0.8))spawnPlatform();
 
   // 코인 업데이트
   for(var i=coins.length-1;i>=0;i--){
