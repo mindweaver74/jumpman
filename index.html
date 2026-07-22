@@ -519,13 +519,28 @@ function loop(){
     drawBird(b);
     // 캐릭터와 충돌
     var bsy=b.y-scrollY;
-    if(Math.abs(b.x-player.x)<b.size*1.4&&Math.abs(bsy-(player.y-scrollY))<b.size*1.2){
-      if(player.hitCooldown<=0){
+    var psy=player.y-scrollY;
+    var distX=Math.abs(b.x-player.x);
+    var distY=psy-bsy; // 양수 = 플레이어가 새보다 아래 (플레이어 발이 새 위에)
+    if(distX<b.size*1.4&&Math.abs(distY)<b.size*1.4){
+      // 위에서 밟기: 내려오는 중 + 플레이어 발이 새 위쪽에 있을 때
+      if(player.vy>0&&distY>-b.size*0.5&&distY<b.size*1.2){
+        // 새 처치 + 위로 튀어오름
+        player.vy=-14;
+        addP(b.x,b.y,'#ffd700',12,4);
+        addP(b.x,b.y,'#fff',8,3);
+        birds.splice(bi,1);
+        scorePopups.push({x:player.x,y:psy-30,txt:'🐦 +50!',life:1,vy:-2,color:'#ffd700'});
+        score+=50;
+        document.getElementById('h-score').textContent=score+'m';
+        if(score>bestScore){bestScore=score;localStorage.setItem('jmpBest',bestScore);}
+      } else if(player.hitCooldown<=0){
+        // 옆에서 맞기: 아래로 튕김
         player.hitCooldown=60;
-        player.vy=Math.min(player.vy+8,10);// 맞으면 아래로 튕김
+        player.vy=Math.min(player.vy+8,10);
         addP(b.x,b.y,'#f44',10,4);
         birds.splice(bi,1);
-        scorePopups.push({x:player.x,y:player.y-scrollY-30,txt:'😵 앗!',life:1,vy:-1.2,color:'#f44'});
+        scorePopups.push({x:player.x,y:psy-30,txt:'😵 앗!',life:1,vy:-1.2,color:'#f44'});
       }
     }
   }
