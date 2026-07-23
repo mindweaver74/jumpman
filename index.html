@@ -490,7 +490,7 @@ function spawnPlatform(atY){
   else if(h>3&&r<0.32) type='move';
   else if(h>6&&r<0.42) type='break';
   var pw=80+Math.floor(Math.random()*70); // 80~150px 불규칙
-  var p={x:x,y:y,w:pw,h:12,type:type,vx:type==='move'?(Math.random()<0.5?1.2:-1.2):0,hit:false,breakTimer:0};
+  var p={x:x,y:y,w:pw,h:12,type:type,vx:type==='move'?(Math.random()<0.5?2.2:-2.2):0,hit:false,breakTimer:0};
   // 발판이 화면 밖으로 나가지 않게 조정
   if(p.x+p.w>PLAY_X+PLAY_W-5) p.x=PLAY_X+PLAY_W-5-p.w;
   if(p.x<PLAY_X+5) p.x=PLAY_X+5;
@@ -561,7 +561,7 @@ function loop(){
     var p=platforms[i];
     var sy=p.y-scrollY;
     // 이동 발판
-    if(p.type==='move'){p.x+=p.vx;if(p.x<0||p.x+p.w>W)p.vx*=-1;}
+    if(p.type==='move'){p.x+=p.vx;if(p.x<PLAY_X+5||p.x+p.w>PLAY_X+PLAY_W-5)p.vx*=-1;}
     // 부서지는 발판 타이머
     if(p.type==='break'&&p.hit){p.breakTimer++;if(p.breakTimer>18){platforms.splice(i,1);continue;}}
     // 화면 아래로 사라진 발판 제거
