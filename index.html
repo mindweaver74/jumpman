@@ -50,7 +50,29 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#8
 .btn-play{background:linear-gradient(135deg,#4af,#ffd700);color:#fff;}
 .btn-retry{background:linear-gradient(135deg,#f44,#f80);color:#fff;}
 .intro-info{width:100%;max-width:300px;margin-bottom:14px;}
-#footer{position:fixed;bottom:0;left:0;width:100%;
+/* 업그레이드 화면 */
+#upg-screen{position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(5,15,30,0.96);display:none;flex-direction:column;
+  align-items:center;justify-content:center;z-index:110;
+  padding:20px;padding-top:max(20px,env(safe-area-inset-top));
+  padding-bottom:max(20px,env(safe-area-inset-bottom));overflow-y:auto;}
+.upg-title{font-size:20px;font-weight:900;color:#ffd700;margin-bottom:4px;text-align:center;}
+.upg-coin{font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:16px;text-align:center;}
+.upg-list{width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+.upg-item{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.upg-item-icon{font-size:26px;flex-shrink:0;}
+.upg-item-info{flex:1;}
+.upg-item-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;}
+.upg-item-desc{font-size:11px;color:rgba(255,255,255,0.45);}
+.upg-item-lv{font-size:10px;color:#ffd700;margin-top:3px;}
+.upg-item-btn{padding:8px 12px;border-radius:10px;border:none;font-size:12px;
+  font-weight:700;cursor:pointer;-webkit-appearance:none;white-space:nowrap;flex-shrink:0;}
+.upg-btn-can{background:linear-gradient(135deg,#ffd700,#f80);color:#fff;}
+.upg-btn-max{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.35);cursor:not-allowed;}
+.upg-btn-cant{background:rgba(255,50,50,0.15);color:rgba(255,100,100,0.5);cursor:not-allowed;}
+.upg-stars{color:#ffd700;font-size:11px;letter-spacing:1px;}
+#footer{position:fixed;bottom:0;left:0;width:100%;#footer{position:fixed;bottom:0;left:0;width:100%;
   padding:3px 16px max(5px,env(safe-area-inset-bottom));
   display:flex;justify-content:space-between;pointer-events:none;z-index:5;}
 #footer a{font-size:10px;color:rgba(255,255,255,0.2);text-decoration:none;pointer-events:all;}
@@ -71,6 +93,13 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#8
   <a href="https://mindweaver74.github.io/Jutopia">🎮 Jutopia</a>
   <a href="https://mindweaver74.github.io/Jutopia/privacy.html">개인정보처리방침</a>
 </div>
+<div id="upg-screen">
+  <div class="upg-title">🔧 업그레이드</div>
+  <div class="upg-coin" id="upg-coin-disp">🪙 0 코인 보유</div>
+  <div class="upg-list" id="upg-list"></div>
+  <button class="big-btn btn-play" id="upg-back" style="max-width:300px;">← 돌아가기</button>
+</div>
+
 <div id="overlay">
   <div class="ov-title">🕴️ 하늘 위로!</div>
   <div class="ov-sub" id="ov-sub">안경 쓴 그가 하늘을 향해 도약한다!<br>발판을 밟고 최고 높이에 도전하세요</div>
@@ -103,20 +132,80 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#8
     <div class="ov-stat"><div class="ov-sv" id="st-plat">0</div><div class="ov-sl">발판</div></div>
   </div>
   <button class="big-btn btn-play" id="btn-play">🕴️ 도약!</button>
+  <button id="btn-upg-open" style="margin-top:6px;padding:10px;width:100%;max-width:300px;
+    border-radius:50px;border:1px solid rgba(255,215,0,0.3);background:rgba(255,215,0,0.08);
+    color:#ffd700;font-size:13px;font-weight:700;cursor:pointer;">🔧 업그레이드</button>
 </div>
 
 <script>
 var canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
 var W,H;
-function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+  // PC 넓은 화면에서도 플레이 영역은 최대 480px로 제한
+  PLAY_W=Math.min(W, 480);
+  PLAY_X=(W-PLAY_W)/2; // 플레이 영역 시작 X
+}
 window.addEventListener('resize',resize);resize();
 
 // ── 저장 ──
 var bestScore=+(localStorage.getItem('jmpBest')||0);
 var totalCoins=+(localStorage.getItem('jmpCoins')||0);
 
+// ── 업그레이드 시스템 ──
+var UPG_DEF=[
+  {id:'jump',   icon:'🦘',name:'점프력',      desc:'점프 높이 증가',         maxLv:3,costs:[30,60,100],effect:function(lv){return lv*1.5;}},
+  {id:'speed',  icon:'👟',name:'이동 속도',    desc:'좌우 이동 속도 증가',    maxLv:3,costs:[25,50,80], effect:function(lv){return lv*0.8;}},
+  {id:'magnet', icon:'🧲',name:'코인 자석',    desc:'코인 흡수 범위 확대',    maxLv:3,costs:[20,40,70], effect:function(lv){return lv*12;}},
+  {id:'shield', icon:'🛡️',name:'새 방어막',    desc:'새 충돌 쿨타임 단축',    maxLv:2,costs:[50,90],    effect:function(lv){return lv*20;}},
+  {id:'spring', icon:'🌀',name:'스프링 부스트',desc:'스프링 점프력 추가 증가', maxLv:2,costs:[60,100],   effect:function(lv){return lv*4;}},
+];
+var upgLevels={};
+function loadUpg(){try{var s=localStorage.getItem('jmpUpg');if(s)upgLevels=JSON.parse(s);}catch(e){}}
+function saveUpg(){localStorage.setItem('jmpUpg',JSON.stringify(upgLevels));}
+loadUpg();
+function getUpgLv(id){return upgLevels[id]||0;}
+function getUpgEffect(id){
+  var u=UPG_DEF.filter(function(u){return u.id===id;})[0];
+  return u?u.effect(getUpgLv(id)):0;
+}
+function renderUpgScreen(){
+  document.getElementById('upg-coin-disp').textContent='🪙 '+totalCoins+' 코인 보유';
+  var list=document.getElementById('upg-list');
+  list.innerHTML='';
+  UPG_DEF.forEach(function(u){
+    var lv=getUpgLv(u.id),maxed=lv>=u.maxLv,cost=maxed?0:u.costs[lv],canBuy=!maxed&&totalCoins>=cost;
+    var stars='';for(var i=0;i<u.maxLv;i++)stars+=(i<lv?'★':'☆');
+    var div=document.createElement('div');div.className='upg-item';
+    div.innerHTML='<div class="upg-item-icon">'+u.icon+'</div>'
+      +'<div class="upg-item-info"><div class="upg-item-name">'+u.name+'</div>'
+      +'<div class="upg-item-desc">'+u.desc+'</div>'
+      +'<div class="upg-item-lv"><span class="upg-stars">'+stars+'</span>'
+      +(maxed?' <span style="color:rgba(255,255,255,0.3);font-size:10px;">MAX</span>'
+             :' <span style="color:rgba(255,255,255,0.3);font-size:10px;">다음 🪙'+cost+'</span>')
+      +'</div></div>'
+      +'<button class="upg-item-btn '+(maxed?'upg-btn-max':canBuy?'upg-btn-can':'upg-btn-cant')+'" data-id="'+u.id+'" data-cost="'+cost+'">'
+      +(maxed?'MAX':'🪙'+cost)+'</button>';
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.upg-btn-can').forEach(function(btn){
+    function doBuy(){
+      var id=btn.dataset.id,cost=parseInt(btn.dataset.cost);
+      if(totalCoins<cost)return;
+      totalCoins-=cost;upgLevels[id]=(upgLevels[id]||0)+1;
+      localStorage.setItem('jmpCoins',totalCoins);saveUpg();
+      document.getElementById('h-coin').textContent=totalCoins;
+      renderUpgScreen();
+    }
+    btn.addEventListener('click',doBuy);
+    btn.addEventListener('touchend',function(e){e.preventDefault();e.stopPropagation();doBuy();},{passive:false});
+  });
+}
+
 // ── 게임 상태 ──
 var player,platforms,coins,particles,scorePopups,bgStars,clouds,birds;
+var PLAY_W=480,PLAY_X=0;
 var score,coinCount,platCount,frame,gameActive,scrollY;
 var keys={};
 
@@ -137,6 +226,13 @@ function drawBg(){
   bg.addColorStop(0,'rgb('+Math.max(10,r-30)+','+Math.max(10,g-40)+','+Math.max(20,b-20)+')');
   bg.addColorStop(1,'rgb('+r+','+g+','+b+')');
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  // PC 넓은 화면에서 플레이 영역 외곽 어둡게
+  if(PLAY_X>0){
+    ctx.fillStyle='rgba(0,0,0,0.18)';
+    ctx.fillRect(0,0,PLAY_X,H);
+    ctx.fillRect(PLAY_X+PLAY_W,0,W-PLAY_X-PLAY_W,H);
+  }
 
   // 구름
   clouds.forEach(function(c){
@@ -338,7 +434,7 @@ function spawnBird(){
   var sy=scrollY-H*0.3-Math.random()*H*0.5;
   var fromLeft=Math.random()<0.5;
   birds.push({
-    x:fromLeft?-40:W+40,
+    x:fromLeft?PLAY_X-40:PLAY_X+PLAY_W+40,
     y:sy,
     vx:fromLeft?(2.5+Math.random()*2):-(2.5+Math.random()*2),
     flapPhase:Math.random()*Math.PI*2,
@@ -385,7 +481,7 @@ function spawnPlatform(atY){
   var gapMin=(isMobile?55:35)+Math.floor(difficulty*25);
   var gapRand=(isMobile?30:15)+Math.floor(difficulty*15);
   var y=atY!==undefined?atY:getTopY()-gapMin-Math.random()*gapRand;
-  var x=Math.random()*(W-160)+10; // 너비 최대값 고려
+  var x=PLAY_X+10+Math.random()*(PLAY_W-170); // 플레이 영역 안에만 배치
   var r=Math.random();
   var type='normal';
   var h=Math.floor(score/100);
@@ -396,8 +492,8 @@ function spawnPlatform(atY){
   var pw=80+Math.floor(Math.random()*70); // 80~150px 불규칙
   var p={x:x,y:y,w:pw,h:12,type:type,vx:type==='move'?(Math.random()<0.5?1.2:-1.2):0,hit:false,breakTimer:0};
   // 발판이 화면 밖으로 나가지 않게 조정
-  if(p.x+p.w>W-5) p.x=W-5-p.w;
-  if(p.x<5) p.x=5;
+  if(p.x+p.w>PLAY_X+PLAY_W-5) p.x=PLAY_X+PLAY_W-5-p.w;
+  if(p.x<PLAY_X+5) p.x=PLAY_X+5;
 
   // 발판 위에 코인 가끔 생성
   if(Math.random()<0.3){
@@ -411,11 +507,11 @@ function initGame(){
   score=0;coinCount=0;platCount=0;frame=0;scrollY=0;gameActive=true;
   particles=[];scorePopups=[];birds=[];
 
-  player={x:W/2,y:H-100,vx:0,vy:-14,onGround:false,shieldTimer:0,hitCooldown:0};
+  player={x:PLAY_X+PLAY_W/2,y:H-100,vx:0,vy:-14,onGround:false,shieldTimer:0,hitCooldown:0};
 
   platforms=[];coins=[];
   // 시작 발판
-  platforms.push({x:W/2-55,y:H-60,w:110,h:12,type:'normal',vx:0,hit:false}); // 시작 발판은 크게
+  platforms.push({x:PLAY_X+PLAY_W/2-55,y:H-60,w:110,h:12,type:'normal',vx:0,hit:false}); // 시작 발판은 크게
   // 초기 발판들
   var initGap=H<700?65:48;
   var initCount=H<700?14:16;
@@ -435,7 +531,7 @@ function loop(){
   if(!gameActive)return;
 
   // 입력
-  var spd=5.5;
+  var spd=5.5+getUpgEffect('speed');
   if(keys['left']||keys['ArrowLeft'])  player.vx+=(-spd-player.vx)*0.25;
   else if(keys['right']||keys['ArrowRight']) player.vx+=(spd-player.vx)*0.25;
   else player.vx*=0.82;
@@ -446,9 +542,9 @@ function loop(){
   player.y+=player.vy;
   player.onGround=false;
 
-  // 화면 좌우 랩
-  if(player.x<-20)player.x=W+20;
-  if(player.x>W+20)player.x=-20;
+  // 플레이 영역 좌우 랩
+  if(player.x<PLAY_X-20)player.x=PLAY_X+PLAY_W+20;
+  if(player.x>PLAY_X+PLAY_W+20)player.x=PLAY_X-20;
 
   // 스크롤
   var mid=H*0.42;
@@ -478,13 +574,13 @@ function loop(){
       if(px+12>p.x+6&&px-12<p.x+p.w-6&&py>sy&&py<sy+p.h+player.vy+2){
         if(p.type==='break'){if(!p.hit){p.hit=true;addP(p.x+p.w/2,p.y,'#f44',8,3);}}
         else if(p.type==='spring'){
-          player.vy=-22;addP(p.x+p.w/2,p.y,'#ffd700',10,4);
+          player.vy=-(22+getUpgEffect('spring'));addP(p.x+p.w/2,p.y,'#ffd700',10,4);
           scorePopups.push({x:player.x,y:player.y-scrollY-30,txt:'x2 ⬆️',life:1,vy:-2,color:'#ffd700'});
         } else if(p.type==='super'){
-          player.vy=-34;addP(p.x+p.w/2,p.y,'#c4f',16,6);
+          player.vy=-(34+getUpgEffect('spring')*1.5);addP(p.x+p.w/2,p.y,'#c4f',16,6);
           scorePopups.push({x:player.x,y:player.y-scrollY-30,txt:'x3 🚀',life:1,vy:-2,color:'#c4f'});
         }
-        else{player.vy=-14+Math.min(0,player.vy*0.05);}
+        else{player.vy=-(14+getUpgEffect('jump'))+Math.min(0,player.vy*0.05);}
         if(p.type!=='break'){player.onGround=true;platCount++;addP(px,player.y,'rgba(100,200,100,0.6)',5,2);}
       }
     }
@@ -500,7 +596,8 @@ function loop(){
     if(cy>H+30){coins.splice(i,1);continue;}
     if(c.collected){coins.splice(i,1);continue;}
     drawCoin(c);
-    if(!c.collected&&Math.abs(c.x-player.x)<22&&Math.abs(c.y-player.y)<22){
+    var mRange=22+getUpgEffect('magnet');
+    if(!c.collected&&Math.abs(c.x-player.x)<mRange&&Math.abs(c.y-player.y)<mRange){
       c.collected=true;coinCount++;totalCoins++;
       localStorage.setItem('jmpCoins',totalCoins);
       document.getElementById('h-coin').textContent=totalCoins;
@@ -516,8 +613,8 @@ function loop(){
     var b=birds[bi];
     b.x+=b.vx;
     // 화면 끝에서 방향 전환 (좌우 반복)
-    if(b.x<20) b.vx=Math.abs(b.vx);
-    if(b.x>W-20) b.vx=-Math.abs(b.vx);
+    if(b.x<PLAY_X+20) b.vx=Math.abs(b.vx);
+    if(b.x>PLAY_X+PLAY_W-20) b.vx=-Math.abs(b.vx);
     // 위아래로도 약간 물결치며 이동
     b.y+=Math.sin(b.flapPhase*0.5)*0.5;
     // 일정 시간 후 제거 (너무 오래 남지 않도록 타이머)
@@ -543,7 +640,7 @@ function loop(){
         if(score>bestScore){bestScore=score;localStorage.setItem('jmpBest',bestScore);}
       } else if(player.hitCooldown<=0){
         // 옆에서 맞기: 아래로 튕김
-        player.hitCooldown=60;
+        player.hitCooldown=Math.max(20,60-getUpgEffect('shield'));
         player.vy=Math.min(player.vy+8,10);
         addP(b.x,b.y,'#f44',10,4);
         birds.splice(bi,1);
@@ -619,6 +716,18 @@ function bindBtn(id,fn){
   addEL(el,'click',fn);
   addEL(el,'touchend',function(e){e.preventDefault();e.stopPropagation();fn();},{passive:false});
 }
+// 업그레이드 화면 열기/닫기
+var upgBtn=document.getElementById('btn-upg-open');
+if(upgBtn){
+  upgBtn.addEventListener('click',function(){renderUpgScreen();document.getElementById('upg-screen').style.display='flex';});
+  upgBtn.addEventListener('touchend',function(e){e.preventDefault();e.stopPropagation();renderUpgScreen();document.getElementById('upg-screen').style.display='flex';},{passive:false});
+}
+var backBtn=document.getElementById('upg-back');
+if(backBtn){
+  backBtn.addEventListener('click',function(){document.getElementById('upg-screen').style.display='none';});
+  backBtn.addEventListener('touchend',function(e){e.preventDefault();e.stopPropagation();document.getElementById('upg-screen').style.display='none';},{passive:false});
+}
+
 bindBtn('btn-play',function(){
   getSfx();
   document.getElementById('intro-info').style.display='block';
